@@ -2,18 +2,24 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from bot import build_bot
 from langchain_core.messages import HumanMessage
-import logging
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 workflow = build_bot()
 
-logging.basicConfig(level=logging.INFO)
+# Enable CORS for Streamlit frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # You can restrict to your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class Query(BaseModel):
     question: str
 
 @app.post("/chat")
 def chat(req: Query):
-    logging.info(f"Incoming: {req.question}")
     result = workflow.invoke({"messages": [HumanMessage(content=req.question)]})
     return {"response": result["messages"][-1].content}
