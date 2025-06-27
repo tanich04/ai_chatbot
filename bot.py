@@ -7,24 +7,25 @@ from typing import Literal
 from langchain_core.messages import HumanMessage
 from mock_calendar import check_availability, create_event, delete_event, modify_event
 
+# Improved tool descriptions (docstrings)
 @tool
 def check_slot(date: str) -> str:
-    """Check available slots for a given date."""
+    """Returns available meeting slots for a specific date in YYYY-MM-DD format."""
     return check_availability(date)
 
 @tool
 def book_slot(date: str, time: str, title: str) -> str:
-    """Book a slot on a given date and time."""
+    """Books a meeting on the specified date (YYYY-MM-DD), time (e.g., 2PM), and title."""
     return create_event(date, time, title)
 
 @tool
 def delete_slot(date: str, time: str) -> str:
-    """Delete a scheduled meeting."""
+    """Deletes a meeting on the given date (YYYY-MM-DD) and time (e.g., 2PM)."""
     return delete_event(date, time)
 
 @tool
 def modify_slot(date: str, old_time: str, new_time: str) -> str:
-    """Move a meeting to a different time."""
+    """Modifies a meeting from old_time to new_time on the given date (YYYY-MM-DD)."""
     return modify_event(date, old_time, new_time)
 
 class BookingBot:
@@ -34,6 +35,8 @@ class BookingBot:
             raise ValueError("GROQ_API_KEY not found in environment variables.")
 
         self.llm = ChatGroq(api_key=api_key, model_name="llama3-8b-8192")
+
+        # Tool setup
         self.tools = [check_slot, book_slot, delete_slot, modify_slot]
         self.llm_with_tools = self.llm.bind_tools(self.tools)
         self.tool_node = ToolNode(tools=self.tools)
@@ -42,12 +45,13 @@ class BookingBot:
         messages = state["messages"]
         response = self.llm_with_tools.invoke(messages)
         print("🧠 Bot:", response.content)
-        print("🔧 Tool Calls:", response.tool_calls)
+        print("🔧 Tool Calls:", getattr(response, "tool_calls", []))
         return {"messages": [response]}
 
     def router(self, state: MessagesState) -> Literal["tools", END]:
         messages = state["messages"]
-        if messages[-1].tool_calls:
+        last = messages[-1]
+        if getattr(last, "tool_calls", []):
             return "tools"
         return END
 
