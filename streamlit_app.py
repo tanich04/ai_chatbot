@@ -13,7 +13,7 @@ if "history" not in st.session_state:
     st.session_state.history = []
 
 # ✅ Replace with your Railway URL
-BACKEND_URL = "https://aichatbot-production-a7c6.up.railway.app/"
+BACKEND_URL = "https://aichatbot-production-a7c6.up.railway.app/chat"
 
 if user_input:
     st.session_state.history.append({"role": "user", "content": user_input})
