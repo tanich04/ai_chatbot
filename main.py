@@ -1,4 +1,3 @@
-# main.py
 from fastapi import FastAPI
 from pydantic import BaseModel
 from bot import build_bot
@@ -7,10 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# Allow requests from anywhere (optional: restrict to Streamlit app later)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Allow Streamlit to talk to this API
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
