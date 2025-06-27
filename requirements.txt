@@ -1,9 +1,9 @@
-streamlit
-requests
-pandas
+fastapi
+uvicorn
 langchain
 langgraph
 langchain-core
 langchain-groq
 python-dotenv
+pydantic
 dateparser
