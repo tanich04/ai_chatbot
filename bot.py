@@ -19,26 +19,32 @@ load_dotenv()
 
 @tool
 def check_slot(date: str) -> str:
+    """Check available slots for a given date."""
     return check_availability(date)
 
 @tool
 def book_slot(date: str, time: str, title: str) -> str:
+    """Book a slot on a given date and time."""
     return create_event(date, time, title)
 
 @tool
 def delete_slot(date: str, time: str) -> str:
+    """Delete a scheduled meeting."""
     return delete_event(date, time)
 
 @tool
 def modify_slot(date: str, old_time: str, new_time: str) -> str:
+    """Move a meeting to a different time."""
     return modify_event(date, old_time, new_time)
 
 @tool
 def view_day(date: str) -> str:
+    """View all events scheduled on a specific day."""
     return get_calendar_day_view(date)
 
 @tool
 def view_week(date: str) -> str:
+    """View events for the entire week starting from a specific date."""
     return get_calendar_week_view(date)
 
 class BookingBot:
