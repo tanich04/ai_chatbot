@@ -1,42 +1,43 @@
 import streamlit as st
 import requests
 import pandas as pd
-from mock_calendar import load_calendar
+from mock_calendar import calendar_data, normalize_date
 
-st.set_page_config(page_title="📅 AI Calendar Bot", layout="centered")
-st.title("📅 AI Calendar Booking Assistant")
-st.markdown("What would you like to do?")
+st.set_page_config(page_title="📅 AI Calendar Assistant")
+st.title("📅 AI Calendar Assistant")
 
-user_input = st.chat_input("Type here...")
+st.sidebar.header("🗓️ Calendar")
+if calendar_data:
+    rows = []
+    for date in sorted(calendar_data):
+        for time, title in calendar_data[date].items():
+            rows.append({"Date": date, "Time": time, "Event": title})
+    df = pd.DataFrame(rows)
+    st.dataframe(df.sort_values(by=["Date", "Time"]))
+else:
+    st.sidebar.info("No events yet. Start booking!")
 
-if "history" not in st.session_state:
-    st.session_state.history = []
+st.divider()
+st.subheader("🤖 Chat with your assistant")
+
+if "chat" not in st.session_state:
+    st.session_state.chat = []
+
+user_input = st.text_input("You:", placeholder="e.g. Book a meeting on Monday at 2PM")
 
 if user_input:
-    st.session_state.history.append({"role": "user", "content": user_input})
-    with st.spinner("Talking to calendar bot..."):
-        try:
-            response = requests.post("https://aichatbot-production-a7c6.up.railway.app/chat", json={"question": user_input})
-            if response.status_code == 200:
-                answer = response.json()["response"]
-            else:
-                answer = f"❌ Error: {response.status_code} - {response.text}"
-        except Exception as e:
-            answer = f"❌ Error: Could not get response.\n\n{e}"
-        st.session_state.history.append({"role": "assistant", "content": answer})
+    st.session_state.chat.append({"role": "user", "content": user_input})
+    try:
+        response = requests.post(
+            "https://aichatbot-production-a7c6.up.railway.app/chat",
+            json={"question": user_input},
+            timeout=30
+        )
+        bot_reply = response.json()["response"]
+    except Exception as e:
+        bot_reply = f"❌ Error: {e}"
+    st.session_state.chat.append({"role": "bot", "content": bot_reply})
 
-for chat in st.session_state.history:
-    with st.chat_message(chat["role"]):
-        st.markdown(chat["content"])
-
-with st.expander("📋 Show calendar data"):
-    calendar_data = load_calendar()
-    rows = []
-    if calendar_data:
-        for date, slots in calendar_data.items():
-            for time, title in slots.items():
-                rows.append({"Date": date, "Time": time, "Event": title})
-        df = pd.DataFrame(rows)
-        st.dataframe(df.sort_values(by=["Date", "Time"]))
-    else:
-        st.info("📭 No events scheduled yet.")
+for chat in st.session_state.chat:
+    align = "🧑‍💻 You:" if chat["role"] == "user" else "🤖 Bot:"
+    st.write(f"{align} {chat['content']}")
