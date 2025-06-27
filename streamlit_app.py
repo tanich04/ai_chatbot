@@ -1,39 +1,58 @@
 import streamlit as st
 import requests
 import pandas as pd
-from mock_calendar import calendar_data
 
-st.set_page_config(page_title="📅 AI Calendar Assistant")
+st.set_page_config(page_title="📅 AI Calendar Assistant", layout="centered")
 st.title("📅 AI Calendar Assistant")
 
-st.sidebar.header("📋 Events")
-if calendar_data:
-    rows = []
-    for date in sorted(calendar_data):
-        for time, title in calendar_data[date].items():
-            rows.append({"Date": date, "Time": time, "Event": title})
-    df = pd.DataFrame(rows)
-    st.dataframe(df.sort_values(by=["Date", "Time"]))
-else:
-    st.sidebar.info("No meetings yet.")
+st.markdown("""
+Welcome! Ask me anything about your schedule:
+- Book a meeting on Friday at 3PM
+- Delete my Tuesday 10AM meeting
+- What's available next Monday?
+- Show my calendar week view
+""")
 
-st.subheader("💬 Talk to Calendar Bot")
-if "chat" not in st.session_state:
-    st.session_state.chat = []
+with st.form(key="chat_form"):
+    user_input = st.text_input("You:", placeholder="e.g., Book a meeting on Monday at 2PM")
+    submit = st.form_submit_button("Send")
 
-query = st.text_input("Ask me anything about your meetings")
-
-if query:
-    st.session_state.chat.append(("user", query))
+if submit and user_input:
     try:
-        res = requests.post(
-            "https://aichatbot-production-a7c6.up.railway.app/chat",
-            json={"question": query}
+        response = requests.post(
+            "http://localhost:8000/chat",
+            json={"question": user_input},
+            timeout=10
         )
-        ans = res.json().get("response", "❌ Error: No response.")
+        if response.status_code == 200:
+            answer = response.json().get("response", "❌ No response")
+        else:
+            answer = f"❌ Error: {response.status_code}"
     except Exception as e:
-        ans = f"❌ Error: {e}"
-    st.session_state.chat.append(("bot", ans))
+        answer = f"❌ Error: {e}"
 
-for sender, msg in st.session_state.chat:
-    st.write(f"**{'You' if sender == 'user' else 'Bot'}:** {msg}")
+    st.markdown(f"**Bot:** {answer}")
+
+# Calendar visualization
+st.markdown("---")
+st.subheader("📋 Calendar Events Overview")
+
+try:
+    calendar_res = requests.get("http://localhost:8000/calendar")
+    if calendar_res.status_code == 200:
+        calendar_json = calendar_res.json()
+        flat_data = [
+            {"Date": date, "Time": time, "Event": event}
+            for date, times in calendar_json.items()
+            for time, event in times.items()
+        ]
+        if flat_data:
+            df = pd.DataFrame(flat_data)
+            df_sorted = df.sort_values(by=["Date", "Time"])
+            st.dataframe(df_sorted, use_container_width=True)
+        else:
+            st.info("📭 No events found in calendar.")
+    else:
+        st.error("❌ Could not fetch calendar data.")
+except Exception as e:
+    st.error(f"❌ Error fetching calendar: {e}")
