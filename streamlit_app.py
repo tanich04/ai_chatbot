@@ -43,15 +43,15 @@ if user_input:
     st.session_state.chat.append({"role": "assistant", "content": answer})
 
 # Calendar view
-st.markdown("---")
-if st.button("📋 Show calendar data"):
-    calendar_data = get_calendar_matrix()
-    rows = []
-    for date, slots in calendar_data.items():
-        for time, event in slots.items():
-            rows.append({"Date": date, "Time": time, "Event": event})
-    if rows:
-        df = pd.DataFrame(rows).sort_values(by=["Date", "Time"])
-        st.dataframe(df, use_container_width=True)
-    else:
-        st.info("📭 No events scheduled.")
+# st.markdown("---")
+# if st.button("📋 Show calendar data"):
+#     calendar_data = get_calendar_matrix()
+#     rows = []
+#     for date, slots in calendar_data.items():
+#         for time, event in slots.items():
+#             rows.append({"Date": date, "Time": time, "Event": event})
+#     if rows:
+#         df = pd.DataFrame(rows).sort_values(by=["Date", "Time"])
+#         st.dataframe(df, use_container_width=True)
+#     else:
+#         st.info("📭 No events scheduled.")
