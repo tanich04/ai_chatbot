@@ -1,0 +1,9 @@
+streamlit
+requests
+pandas
+langchain
+langgraph
+langchain-core
+langchain-groq
+python-dotenv
+dateparser
