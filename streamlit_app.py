@@ -1,58 +1,49 @@
 import streamlit as st
 import requests
 import pandas as pd
+import json
 
-st.set_page_config(page_title="📅 AI Calendar Assistant", layout="centered")
-st.title("📅 AI Calendar Assistant")
+st.set_page_config(page_title="📅 AI Meeting Assistant")
 
-st.markdown("""
-Welcome! Ask me anything about your schedule:
-- Book a meeting on Friday at 3PM
-- Delete my Tuesday 10AM meeting
-- What's available next Monday?
-- Show my calendar week view
-""")
+st.title("🤖 AI Meeting Assistant")
+st.caption("Ask me anything about your meetings (e.g., 'Book a meeting on Monday at 2PM')")
 
-with st.form(key="chat_form"):
-    user_input = st.text_input("You:", placeholder="e.g., Book a meeting on Monday at 2PM")
-    submit = st.form_submit_button("Send")
+API_URL = "https://aichatbot-production-a7c6.up.railway.app/chat"
 
-if submit and user_input:
+# Chat interface
+for message in st.session_state.get("chat_history", []):
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+user_input = st.chat_input("Ask me anything about your calendar...")
+if user_input:
+    st.session_state.chat_history = st.session_state.get("chat_history", [])
+    st.session_state.chat_history.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
     try:
-        response = requests.post(
-            "http://localhost:8000/chat",
-            json={"question": user_input},
-            timeout=10
-        )
-        if response.status_code == 200:
-            answer = response.json().get("response", "❌ No response")
-        else:
-            answer = f"❌ Error: {response.status_code}"
+        response = requests.post(API_URL, json={"question": user_input})
+        answer = response.json()["response"]
+        st.session_state.chat_history.append({"role": "assistant", "content": answer})
+        with st.chat_message("assistant"):
+            st.markdown(answer)
     except Exception as e:
-        answer = f"❌ Error: {e}"
+        st.error(f"❌ Error: Could not get response.\n\n{e}")
 
-    st.markdown(f"**Bot:** {answer}")
-
-# Calendar visualization
-st.markdown("---")
-st.subheader("📋 Calendar Events Overview")
-
-try:
-    calendar_res = requests.get("http://localhost:8000/calendar")
-    if calendar_res.status_code == 200:
-        calendar_json = calendar_res.json()
-        flat_data = [
-            {"Date": date, "Time": time, "Event": event}
-            for date, times in calendar_json.items()
-            for time, event in times.items()
-        ]
-        if flat_data:
-            df = pd.DataFrame(flat_data)
-            df_sorted = df.sort_values(by=["Date", "Time"])
-            st.dataframe(df_sorted, use_container_width=True)
+# 📅 View Calendar Button
+if st.button("📋 Show calendar data"):
+    try:
+        with open("calendar.json", "r") as f:
+            calendar_data = json.load(f)
+        data = []
+        for date, slots in calendar_data.items():
+            for time, title in slots.items():
+                data.append({"Date": date, "Time": time, "Title": title})
+        if data:
+            df = pd.DataFrame(data)
+            st.dataframe(df.sort_values(by=["Date", "Time"]))
         else:
-            st.info("📭 No events found in calendar.")
-    else:
-        st.error("❌ Could not fetch calendar data.")
-except Exception as e:
-    st.error(f"❌ Error fetching calendar: {e}")
+            st.info("📭 No events scheduled.")
+    except FileNotFoundError:
+        st.warning("📭 Calendar file not found.")
