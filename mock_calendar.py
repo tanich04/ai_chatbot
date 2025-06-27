@@ -1,6 +1,7 @@
 import json
 import dateparser
 from typing import Dict
+from datetime import datetime, timedelta
 
 FILE = "calendar.json"
 
@@ -56,13 +57,25 @@ def modify_event(date: str, old_time: str, new_time: str) -> str:
         return f"✏️ Moved '{title}' from {old_time} to {new_time} on {date}."
     return f"❌ No event at {old_time} to modify on {date}."
 
-def get_calendar_matrix() -> str:
-    if not calendar_data:
-        return "📭 No events scheduled."
-    calendar_view = "🗓️ **Calendar Overview**\n\n"
-    for date in sorted(calendar_data.keys()):
-        calendar_view += f"📅 {date}:\n"
-        for time in sorted(calendar_data[date].keys()):
-            event = calendar_data[date][time]
-            calendar_view += f"  ⏰ {time} → {event}\n"
-    return calendar_view
+def get_calendar_day_view(date: str) -> str:
+    date = normalize_date(date)
+    if date not in calendar_data:
+        return f"📭 No events found on {date}."
+    response = f"📅 Events on {date}:\n"
+    for time, title in sorted(calendar_data[date].items()):
+        response += f"  ⏰ {time} → {title}\n"
+    return response
+
+def get_calendar_week_view(date: str) -> str:
+    parsed_date = dateparser.parse(date)
+    if not parsed_date:
+        return "❌ Invalid date provided."
+    start = parsed_date - timedelta(days=parsed_date.weekday())
+    week_dates = [(start + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
+    response = "📅 Events This Week:\n"
+    for d in week_dates:
+        if d in calendar_data:
+            response += f"\n🗓️ {d}:\n"
+            for time, title in sorted(calendar_data[d].items()):
+                response += f"  ⏰ {time} → {title}\n"
+    return response if "🗓️" in response else "📭 No events this week."
