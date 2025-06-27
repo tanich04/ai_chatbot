@@ -1,12 +1,12 @@
 import streamlit as st
 import requests
 import pandas as pd
-from mock_calendar import calendar_data, normalize_date
+from mock_calendar import calendar_data
 
 st.set_page_config(page_title="📅 AI Calendar Assistant")
 st.title("📅 AI Calendar Assistant")
 
-st.sidebar.header("🗓️ Calendar")
+st.sidebar.header("📋 Events")
 if calendar_data:
     rows = []
     for date in sorted(calendar_data):
@@ -15,29 +15,25 @@ if calendar_data:
     df = pd.DataFrame(rows)
     st.dataframe(df.sort_values(by=["Date", "Time"]))
 else:
-    st.sidebar.info("No events yet. Start booking!")
+    st.sidebar.info("No meetings yet.")
 
-st.divider()
-st.subheader("🤖 Chat with your assistant")
-
+st.subheader("💬 Talk to Calendar Bot")
 if "chat" not in st.session_state:
     st.session_state.chat = []
 
-user_input = st.text_input("You:", placeholder="e.g. Book a meeting on Monday at 2PM")
+query = st.text_input("Ask me anything about your meetings")
 
-if user_input:
-    st.session_state.chat.append({"role": "user", "content": user_input})
+if query:
+    st.session_state.chat.append(("user", query))
     try:
-        response = requests.post(
+        res = requests.post(
             "https://aichatbot-production-a7c6.up.railway.app/chat",
-            json={"question": user_input},
-            timeout=30
+            json={"question": query}
         )
-        bot_reply = response.json()["response"]
+        ans = res.json().get("response", "❌ Error: No response.")
     except Exception as e:
-        bot_reply = f"❌ Error: {e}"
-    st.session_state.chat.append({"role": "bot", "content": bot_reply})
+        ans = f"❌ Error: {e}"
+    st.session_state.chat.append(("bot", ans))
 
-for chat in st.session_state.chat:
-    align = "🧑‍💻 You:" if chat["role"] == "user" else "🤖 Bot:"
-    st.write(f"{align} {chat['content']}")
+for sender, msg in st.session_state.chat:
+    st.write(f"**{'You' if sender == 'user' else 'Bot'}:** {msg}")
