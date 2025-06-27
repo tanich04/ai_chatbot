@@ -27,10 +27,22 @@ def check_availability(date: str) -> str:
     slots = ["10:00 AM", "2:00 PM", "4:00 PM"]
     booked = calendar_data.get(date, {})
     available = [slot for slot in slots if slot not in booked]
-    return f"📅 Available slots on {date}: {', '.join(available) if available else 'No slots available'}"
+    return f"🗓️ Available slots on {date}: {', '.join(available) if available else 'No slots available'}"
 
 def create_event(date: str, time: str, title: str) -> str:
     date = normalize_date(date)
+
+    if "-" in time:
+        try:
+            start_str, end_str = time.split("-")
+            start = dateparser.parse(start_str.strip())
+            end = dateparser.parse(end_str.strip())
+            if not start or not end:
+                return f"❌ Could not parse time range {time}."
+            time = f"{start.strftime('%I:%M %p')}–{end.strftime('%I:%M %p')}"
+        except Exception as e:
+            return f"❌ Error parsing time range: {e}"
+
     calendar_data.setdefault(date, {})
     if time in calendar_data[date]:
         return f"❌ Slot {time} on {date} is already booked."
@@ -57,11 +69,22 @@ def modify_event(date: str, old_time: str, new_time: str) -> str:
         return f"✏️ Moved '{title}' from {old_time} to {new_time} on {date}."
     return f"❌ No event at {old_time} to modify on {date}."
 
+def get_calendar_matrix() -> str:
+    if not calendar_data:
+        return "📬 No events scheduled."
+    calendar_view = "🗓️ **Calendar Overview**\n\n"
+    for date in sorted(calendar_data.keys()):
+        calendar_view += f"🗓️ {date}:\n"
+        for time in sorted(calendar_data[date].keys()):
+            event = calendar_data[date][time]
+            calendar_view += f"  ⏰ {time} → {event}\n"
+    return calendar_view
+
 def get_calendar_day_view(date: str) -> str:
     date = normalize_date(date)
     if date not in calendar_data:
-        return f"📭 No events found on {date}."
-    response = f"📅 Events on {date}:\n"
+        return f"📬 No events found on {date}."
+    response = f"🗓️ Events on {date}:\n"
     for time, title in sorted(calendar_data[date].items()):
         response += f"  ⏰ {time} → {title}\n"
     return response
@@ -72,10 +95,20 @@ def get_calendar_week_view(date: str) -> str:
         return "❌ Invalid date provided."
     start = parsed_date - timedelta(days=parsed_date.weekday())
     week_dates = [(start + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
-    response = "📅 Events This Week:\n"
+
+    response = "🗓️ Events This Week:\n"
     for d in week_dates:
         if d in calendar_data:
             response += f"\n🗓️ {d}:\n"
             for time, title in sorted(calendar_data[d].items()):
                 response += f"  ⏰ {time} → {title}\n"
-    return response if "🗓️" in response else "📭 No events this week."
+    return response if "🗓️" in response else "📬 No events this week."
+
+
+# ✅ Bonus (optional) helper for consistent sorting
+
+def format_time_str(time_str):
+    try:
+        return datetime.strptime(time_str, "%I:%M %p").strftime("%I:%M %p")
+    except:
+        return time_str
