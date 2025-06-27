@@ -1,49 +1,80 @@
 import streamlit as st
 import requests
-import pandas as pd
 import json
+from datetime import datetime
 
-st.set_page_config(page_title="📅 AI Meeting Assistant")
+BACKEND_URL = "https://aichatbot-production-a7c6.up.railway.app/chat"  # ✅ Your FastAPI backend
 
-st.title("🤖 AI Meeting Assistant")
-st.caption("Ask me anything about your meetings (e.g., 'Book a meeting on Monday at 2PM')")
+st.set_page_config(page_title="📅 Calendar Bot", layout="centered")
+st.title("🤖 AI Calendar Assistant")
+st.caption("Ask me to book, delete, move or view your meetings!")
 
-API_URL = "https://aichatbot-production-a7c6.up.railway.app/chat"
+# --- Chat Section ---
+if "chat" not in st.session_state:
+    st.session_state.chat = []
 
-# Chat interface
-for message in st.session_state.get("chat_history", []):
+user_input = st.chat_input("Ask something like 'Book meeting on Monday at 2PM'")
+if user_input:
+    st.session_state.chat.append({"role": "user", "content": user_input})
+    with st.spinner("Talking to bot..."):
+        try:
+            response = requests.post(BACKEND_URL, json={"messages": st.session_state.chat})
+            answer = response.json()["response"]
+        except Exception as e:
+            answer = f"❌ Error: {e}"
+        st.session_state.chat.append({"role": "assistant", "content": answer})
+
+# --- Display Conversation ---
+for message in st.session_state.chat:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-user_input = st.chat_input("Ask me anything about your calendar...")
-if user_input:
-    st.session_state.chat_history = st.session_state.get("chat_history", [])
-    st.session_state.chat_history.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.markdown(user_input)
+st.divider()
 
-    try:
-        response = requests.post(API_URL, json={"question": user_input})
-        answer = response.json()["response"]
-        st.session_state.chat_history.append({"role": "assistant", "content": answer})
-        with st.chat_message("assistant"):
-            st.markdown(answer)
-    except Exception as e:
-        st.error(f"❌ Error: Could not get response.\n\n{e}")
+# --- 📚 Calendar Logs Viewer ---
+st.subheader("📚 Calendar Log History")
 
-# 📅 View Calendar Button
-if st.button("📋 Show calendar data"):
-    try:
-        with open("calendar.json", "r") as f:
-            calendar_data = json.load(f)
-        data = []
-        for date, slots in calendar_data.items():
-            for time, title in slots.items():
-                data.append({"Date": date, "Time": time, "Title": title})
-        if data:
-            df = pd.DataFrame(data)
-            st.dataframe(df.sort_values(by=["Date", "Time"]))
-        else:
-            st.info("📭 No events scheduled.")
-    except FileNotFoundError:
-        st.warning("📭 Calendar file not found.")
+try:
+    with open("calendar_log.json", "r") as f:
+        logs = json.load(f)
+except FileNotFoundError:
+    logs = []
+
+if logs:
+    # -- Filter Options --
+    st.markdown("### 🔎 Filter Logs")
+    action_filter = st.multiselect("Filter by action", ["create", "modify", "delete"], default=[])
+    date_filter = st.date_input("Filter by date (optional)", value=None)
+
+    # -- Apply Filters --
+    filtered_logs = []
+    for log in logs:
+        include = True
+        if action_filter and log["action"] not in action_filter:
+            include = False
+        if date_filter:
+            log_date = datetime.fromisoformat(log["timestamp"]).date()
+            if log_date != date_filter:
+                include = False
+        if include:
+            filtered_logs.append(log)
+
+    # -- Display Logs --
+    if filtered_logs:
+        for log in reversed(filtered_logs):
+            st.markdown(f"""
+                🔹 **Action**: `{log['action'].capitalize()}`
+                📅 **Date**: `{log['date']}`
+                ⏰ **Time**: `{log['time']}`
+                📝 **Title**: `{log.get('title', '')}`
+                🕒 **Logged at**: `{log['timestamp']}`
+                {"🔁 Moved from: `" + log.get("old_time", "") + "`" if log['action'] == 'modify' else ""}
+                ---
+            """)
+    else:
+        st.info("No logs found matching your filters.")
+    
+    # -- Download Button --
+    st.download_button("📥 Download Full Log", data=json.dumps(logs, indent=2), file_name="calendar_log.json", mime="application/json")
+else:
+    st.info("No logs found.")
