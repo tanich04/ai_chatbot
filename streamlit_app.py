@@ -16,7 +16,7 @@ if user_input:
     st.session_state.history.append({"role": "user", "content": user_input})
     with st.spinner("Talking to calendar bot..."):
         try:
-            response = post_with_retry("https://aichatbot-production-a7c6.up.railway.app/chat", {"question": user_input})
+            response = requests.post("https://aichatbot-production-a7c6.up.railway.app/chat", json={"question": user_input})
             if response.status_code == 200:
                 answer = response.json()["response"]
             else:
