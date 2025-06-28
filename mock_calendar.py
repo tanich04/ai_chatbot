@@ -8,13 +8,12 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 # Safely load service account credentials
-raw_json = os.getenv("SERVICE_ACCOUNT_JSON")
-if not raw_json:
-    raise ValueError("SERVICE_ACCOUNT_JSON environment variable is not set.")
-
 try:
-    service_account_info = json.loads(raw_json.replace("\\n", "\n"))
-except json.JSONDecodeError as e:
+    raw_json = os.environ["SERVICE_ACCOUNT_JSON"]
+    # Fix escape issues
+    fixed_json = raw_json.encode().decode('unicode_escape')
+    service_account_info = json.loads(fixed_json)
+except Exception as e:
     raise ValueError(f"Invalid SERVICE_ACCOUNT_JSON: {e}")
 
 credentials = service_account.Credentials.from_service_account_info(service_account_info)
