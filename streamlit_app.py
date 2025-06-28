@@ -20,7 +20,7 @@ if user_input:
     with st.chat_message("assistant"):
         try:
             response = requests.post(
-                "https://YOUR-RAILWAY-URL/chat",
+                "https://aichatbot-production-b99a.up.railway.app/chat",
                 json={"question": user_input},
                 timeout=30
             )
