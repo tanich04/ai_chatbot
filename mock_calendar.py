@@ -134,7 +134,7 @@ def get_calendar_day_view(date: str) -> str:
     if not events:
         return f"📍 No events found on {date}."
 
-    response = f"🗓️ Events on {date}:
+    response = f"🗓️ Events on {date}:\n"
 "
     for e in events:
         time = dateparser.parse(e["start"]["dateTime"]).strftime("%I:%M %p")
