@@ -1,87 +1,159 @@
 import os
 import json
 import dateparser
-from typing import Dict
 from datetime import datetime, timedelta
+from typing import Dict, List
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
-SCOPES = ["https://www.googleapis.com/auth/calendar"]
-SERVICE_ACCOUNT_JSON = json.loads(os.getenv("SERVICE_ACCOUNT_JSON"))
-credentials = service_account.Credentials.from_service_account_info(SERVICE_ACCOUNT_JSON, scopes=SCOPES)
-calendar_service = build("calendar", "v3", credentials=credentials)
-calendar_id = "primary"
+# Load and parse service account credentials from env
+service_account_info = json.loads(os.environ["SERVICE_ACCOUNT_JSON"])
+credentials = service_account.Credentials.from_service_account_info(service_account_info)
 
+# Build Google Calendar API client
+service = build("calendar", "v3", credentials=credentials)
+CALENDAR_ID = "primary"  # You can change to another calendar ID if needed
+
+# Predefined slots to check
 SLOTS = ["10:00 AM", "2:00 PM", "4:00 PM"]
 
-
-def normalize_date(date_str):
+def normalize_date(date_str: str) -> str:
     parsed = dateparser.parse(date_str)
     return parsed.strftime("%Y-%m-%d") if parsed else date_str
 
-def check_availability(date_str: str) -> str:
-    date = normalize_date(date_str)
-    booked = get_events_on(date)
-    available = [s for s in SLOTS if s not in booked]
-    return f"📅 Available slots on {date}: {', '.join(available) if available else 'No slots available'}"
+def create_event(date: str, time: str, title: str) -> str:
+    date = normalize_date(date)
+    time_obj = dateparser.parse(f"{date} {time}")
+    if not time_obj:
+        return f"❌ Invalid date/time."
 
-def create_event(date_str: str, time: str, title: str) -> str:
-    date = normalize_date(date_str)
-    parsed_time = dateparser.parse(f"{date} {time}")
-    end_time = (parsed_time + timedelta(hours=1)).isoformat()
-    body = {
+    start_time = time_obj.isoformat()
+    end_time = (time_obj + timedelta(hours=1)).isoformat()
+
+    event = {
         'summary': title,
-        'start': {'dateTime': parsed_time.isoformat(), 'timeZone': 'Asia/Kolkata'},
+        'start': {'dateTime': start_time, 'timeZone': 'Asia/Kolkata'},
         'end': {'dateTime': end_time, 'timeZone': 'Asia/Kolkata'}
     }
-    calendar_service.events().insert(calendarId=calendar_id, body=body).execute()
+
+    service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
     return f"✅ Event '{title}' booked on {date} at {time}."
 
-def get_events_on(date: str) -> Dict[str, str]:
-    start = datetime.strptime(date, "%Y-%m-%d")
-    end = start + timedelta(days=1)
-    events = calendar_service.events().list(
-        calendarId=calendar_id,
-        timeMin=start.isoformat() + 'Z',
-        timeMax=end.isoformat() + 'Z',
-        singleEvents=True,
-        orderBy="startTime"
-    ).execute().get("items", [])
+def check_availability(date: str) -> str:
+    date = normalize_date(date)
+    start_of_day = dateparser.parse(f"{date} 00:00")
+    end_of_day = start_of_day + timedelta(days=1)
 
-    return {dateparser.parse(e["start"]["dateTime"]).strftime("%I:%M %p"): e["summary"] for e in events if "dateTime" in e["start"]}
+    events_result = service.events().list(
+        calendarId=CALENDAR_ID,
+        timeMin=start_of_day.isoformat() + 'Z',
+        timeMax=end_of_day.isoformat() + 'Z',
+        singleEvents=True,
+        orderBy='startTime'
+    ).execute()
+    events = events_result.get('items', [])
+
+    booked_times = []
+    for event in events:
+        start = event['start'].get('dateTime', '')
+        parsed_time = dateparser.parse(start)
+        if parsed_time:
+            booked_times.append(parsed_time.strftime("%I:%M %p"))
+
+    available = [slot for slot in SLOTS if slot not in booked_times]
+    return f"📅 Available slots on {date}: {', '.join(available) if available else 'No slots available'}"
 
 def delete_event(date: str, time: str) -> str:
-    events = calendar_service.events().list(calendarId=calendar_id).execute().get("items", [])
+    date = normalize_date(date)
+    start_of_day = dateparser.parse(f"{date} 00:00")
+    end_of_day = start_of_day + timedelta(days=1)
+
+    events_result = service.events().list(
+        calendarId=CALENDAR_ID,
+        timeMin=start_of_day.isoformat() + 'Z',
+        timeMax=end_of_day.isoformat() + 'Z',
+        singleEvents=True,
+        orderBy='startTime'
+    ).execute()
+
+    events = events_result.get('items', [])
     for event in events:
-        start = event.get("start", {}).get("dateTime")
-        if start and date in start and time in dateparser.parse(start).strftime("%I:%M %p"):
-            calendar_service.events().delete(calendarId=calendar_id, eventId=event["id"]).execute()
+        start = event['start'].get('dateTime', '')
+        parsed_time = dateparser.parse(start)
+        if parsed_time and parsed_time.strftime("%I:%M %p") == time:
+            service.events().delete(calendarId=CALENDAR_ID, eventId=event['id']).execute()
             return f"🗑️ Deleted event on {date} at {time}."
     return f"❌ No event found at {time} on {date}."
 
 def modify_event(date: str, old_time: str, new_time: str) -> str:
-    events = calendar_service.events().list(calendarId=calendar_id).execute().get("items", [])
+    date = normalize_date(date)
+    start_of_day = dateparser.parse(f"{date} 00:00")
+    end_of_day = start_of_day + timedelta(days=1)
+
+    events_result = service.events().list(
+        calendarId=CALENDAR_ID,
+        timeMin=start_of_day.isoformat() + 'Z',
+        timeMax=end_of_day.isoformat() + 'Z',
+        singleEvents=True,
+        orderBy='startTime'
+    ).execute()
+
+    events = events_result.get('items', [])
     for event in events:
-        start = event.get("start", {}).get("dateTime")
-        if start and date in start and old_time in dateparser.parse(start).strftime("%I:%M %p"):
-            parsed_time = dateparser.parse(f"{date} {new_time}")
-            end_time = (parsed_time + timedelta(hours=1)).isoformat()
-            event['start']['dateTime'] = parsed_time.isoformat()
-            event['end']['dateTime'] = end_time
-            calendar_service.events().update(calendarId=calendar_id, eventId=event['id'], body=event).execute()
+        start = event['start'].get('dateTime', '')
+        parsed_time = dateparser.parse(start)
+        if parsed_time and parsed_time.strftime("%I:%M %p") == old_time:
+            new_start = dateparser.parse(f"{date} {new_time}").isoformat()
+            new_end = (dateparser.parse(f"{date} {new_time}") + timedelta(hours=1)).isoformat()
+            event['start']['dateTime'] = new_start
+            event['end']['dateTime'] = new_end
+            updated_event = service.events().update(calendarId=CALENDAR_ID, eventId=event['id'], body=event).execute()
             return f"✏️ Moved event from {old_time} to {new_time} on {date}."
-    return f"❌ No event found to modify."
+
+    return f"❌ No event at {old_time} to modify on {date}."
 
 def get_calendar_day_view(date: str) -> str:
-    events = get_events_on(date)
+    date = normalize_date(date)
+    start = dateparser.parse(date)
+    end = start + timedelta(days=1)
+
+    events = service.events().list(
+        calendarId=CALENDAR_ID,
+        timeMin=start.isoformat() + 'Z',
+        timeMax=end.isoformat() + 'Z',
+        singleEvents=True,
+        orderBy='startTime'
+    ).execute().get("items", [])
+
     if not events:
-        return f"📭 No events on {date}."
-    return f"📅 {date} Events:\n" + '\n'.join(f"⏰ {t} → {e}" for t, e in events.items())
+        return f"📭 No events found on {date}."
+
+    response = f"📅 Events on {date}:\n"
+    for e in events:
+        time = dateparser.parse(e["start"]["dateTime"]).strftime("%I:%M %p")
+        response += f"  ⏰ {time} → {e['summary']}\n"
+    return response
 
 def get_calendar_week_view(date: str) -> str:
     base = dateparser.parse(date)
-    result = "📆 Week View:\n"
-    for i in range(7):
-        day = (base + timedelta(days=i)).strftime("%Y-%m-%d")
-        result += get_calendar_day_view(day) + '\n'
-    return result
+    start = base - timedelta(days=base.weekday())
+    end = start + timedelta(days=7)
+
+    events = service.events().list(
+        calendarId=CALENDAR_ID,
+        timeMin=start.isoformat() + 'Z',
+        timeMax=end.isoformat() + 'Z',
+        singleEvents=True,
+        orderBy='startTime'
+    ).execute().get("items", [])
+
+    if not events:
+        return "📭 No events this week."
+
+    response = "📅 Events This Week:\n"
+    for e in events:
+        start_time = dateparser.parse(e["start"]["dateTime"])
+        date_str = start_time.strftime("%Y-%m-%d")
+        time_str = start_time.strftime("%I:%M %p")
+        response += f"🗓️ {date_str} → ⏰ {time_str} → {e['summary']}\n"
+    return response
