@@ -1,19 +1,10 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from bot import build_bot
 from langchain_core.messages import HumanMessage
-from fastapi.middleware.cors import CORSMiddleware
+from bot import build_bot
 
 app = FastAPI()
 workflow = build_bot()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 class Query(BaseModel):
     question: str
