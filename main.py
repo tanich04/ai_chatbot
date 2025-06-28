@@ -1,15 +1,24 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from langchain_core.messages import HumanMessage
 from bot import build_bot
+from langchain_core.messages import HumanMessage
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 workflow = build_bot()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 class Query(BaseModel):
-    message: str
+    question: str
 
 @app.post("/chat")
 def chat(req: Query):
-    result = workflow.invoke({"messages": [HumanMessage(content=req.message)]})
+    result = workflow.invoke({"messages": [HumanMessage(content=req.question)]})
     return {"response": result["messages"][-1].content}
