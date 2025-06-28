@@ -5,12 +5,7 @@ from langchain_groq import ChatGroq
 from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage
 from typing import Literal
-from dotenv import load_dotenv
-from mock_calendar import (
-    check_availability, create_event, delete_event, modify_event
-)
-
-load_dotenv()
+from mock_calendar import check_availability, create_event, get_calendar_day_view, get_calendar_week_view
 
 @tool
 def check_slot(date: str) -> str:
@@ -19,27 +14,24 @@ def check_slot(date: str) -> str:
 
 @tool
 def book_slot(date: str, time: str, title: str) -> str:
-    """Book a slot on a given date and time."""
+    """Book a meeting."""
     return create_event(date, time, title)
 
 @tool
-def delete_slot(date: str, time: str) -> str:
-    """Delete a scheduled meeting."""
-    return delete_event(date, time)
+def view_day(date: str) -> str:
+    """View all events on a given day."""
+    return get_calendar_day_view(date)
 
 @tool
-def modify_slot(date: str, old_time: str, new_time: str) -> str:
-    """Move a meeting to a different time."""
-    return modify_event(date, old_time, new_time)
+def view_week(date: str) -> str:
+    """View all events in a week."""
+    return get_calendar_week_view(date)
 
 class BookingBot:
     def __init__(self):
-        api_key = os.getenv("GROQ_API_KEY")
-        if not api_key:
-            raise ValueError("GROQ_API_KEY not found in environment variables.")
-
+        api_key = os.environ.get("GROQ_API_KEY")
         self.llm = ChatGroq(api_key=api_key, model_name="llama3-8b-8192")
-        self.tools = [check_slot, book_slot, delete_slot, modify_slot]
+        self.tools = [check_slot, book_slot, view_day, view_week]
         self.llm_with_tools = self.llm.bind_tools(self.tools)
         self.tool_node = ToolNode(tools=self.tools)
 
