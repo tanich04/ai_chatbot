@@ -35,6 +35,19 @@ def create_event(date: str, time: str, title: str) -> str:
     start_time = time_obj.isoformat()
     end_time = (time_obj + timedelta(hours=1)).isoformat()
 
+    # Check if slot already booked
+    events_result = service.events().list(
+        calendarId=CALENDAR_ID,
+        timeMin=start_time,
+        timeMax=end_time,
+        singleEvents=True,
+        orderBy='startTime'
+    ).execute()
+
+    if events_result.get('items'):
+        return f"❌ Slot {time} on {date} is already booked."
+
+    # Proceed to book the slot
     event = {
         'summary': title,
         'start': {'dateTime': start_time, 'timeZone': 'Asia/Kolkata'},
