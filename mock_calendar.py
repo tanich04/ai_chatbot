@@ -132,14 +132,12 @@ def get_calendar_day_view(date: str) -> str:
     ).execute().get("items", [])
 
     if not events:
-        return f"📍 No events found on {date}."
+        return f"📭 No events found on {date}."
 
     response = f"🗓️ Events on {date}:\n"
-"
     for e in events:
         time = dateparser.parse(e["start"]["dateTime"]).strftime("%I:%M %p")
-        response += f"  ⏰ {time} → {e['summary']}
-"
+        response += f"  ⏰ {time} → {e['summary']}\n"
     return response
 
 def get_calendar_week_view(date: str) -> str:
